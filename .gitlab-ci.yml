@@ -1,0 +1,56 @@
+stages:
+  - validate
+  #- infracost
+  - plan
+  - terratest
+  - apply
+  - destroy
+image:
+  name: hashicorp/terraform:light
+  entrypoint:
+    - "/usr/bin/env"
+    - "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+before_script:
+  # The TFC_TOKEN is defined in the Setting->CI/CD->Variables section of the project in Gitlab
+  - export TF_TOKEN_app_terraform_io=${TFC_TOKEN}
+  - rm -rf .terraform
+  - terraform --version
+  - terraform init
+
+validate:
+  stage: validate
+  script:
+    - terraform validate
+
+plan:
+  stage: plan
+  script:
+    - terraform plan
+  dependencies:
+    - validate
+
+terratest:
+  stage: terratest
+  script:
+    - apk add --no-cache git make musl-dev go
+    - go mod init gitlab.com/stratokumulus1/learn-terraform-cloud.git
+    - go mod tidy
+    - go test -v ./test
+  dependencies:
+    - plan
+
+apply:
+  stage: apply
+  script:
+    - terraform apply -auto-approve
+  dependencies:
+    - plan
+  when: manual
+
+destroy:
+  stage: destroy
+  script:
+    - terraform destroy -auto-approve
+  dependencies:
+    - plan
+  when: manual
